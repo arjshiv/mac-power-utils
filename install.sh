@@ -4,8 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh)
-PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist)
+SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh)
+PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist)
 
 echo "==> Installing mac-power-utils"
 
@@ -41,4 +41,4 @@ echo "    And add this line:"
 echo "    $(whoami) ALL=(ALL) NOPASSWD: /usr/bin/pmset"
 echo ""
 
-echo "==> Done. Logs at ~/Library/Logs/{edge-mem-guard,zoom-guard,battery-throttle}.log"
+echo "==> Done. Logs at ~/Library/Logs/{edge-mem-guard,zoom-guard,battery-throttle,ollama-guard}.log"

@@ -9,6 +9,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `edge-mem-guard.sh` | Kills Edge renderer processes when total memory exceeds a threshold |
 | `zoom-guard.sh` | Quits idle Zoom after 5 minutes, throttles during calls on battery, cleans up orphaned processes |
 | `battery-throttle.sh` | Enables Low Power Mode on battery, renices heavy processes, reverts on AC |
+| `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
 
 ## Requirements
 
@@ -52,12 +53,17 @@ Detects battery/AC transitions and:
 - Renices Edge renderers and Zoom processes on battery
 - Reverts everything when plugging back in
 
+### ollama-guard
+
+Watches for loaded Ollama models sitting idle (no active generation). After 10 minutes of inactivity, unloads models via the API to reclaim memory. A single loaded model can consume 4-24 GB depending on size. Models reload in seconds on the next query, so there's minimal cost to unloading.
+
 ## Logs
 
 All daemons log to `~/Library/Logs/`:
 - `edge-mem-guard.log`
 - `zoom-guard.log`
 - `battery-throttle.log`
+- `ollama-guard.log`
 
 ## How They Interact
 
@@ -71,6 +77,8 @@ edge-mem-guard.sh ────┴── monitors Edge memory independently
 
 zoom-guard.sh ────────┬── kills idle Zoom (battery and AC)
                       └── extra renice during calls (battery only)
+
+ollama-guard.sh ──────── unloads idle models (battery and AC)
 ```
 
 ## License
