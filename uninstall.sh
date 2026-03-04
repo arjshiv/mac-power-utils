@@ -3,8 +3,8 @@ set -euo pipefail
 
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh)
-PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist)
+SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh)
+PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
 
 echo "==> Uninstalling mac-power-utils"
 
@@ -29,7 +29,7 @@ echo "==> Reverting Low Power Mode"
 sudo pmset -b lowpowermode 0 2>/dev/null || true
 
 echo "==> Cleaning up state files"
-rm -f /tmp/zoom-guard.state /tmp/battery-throttle.state /tmp/ollama-guard.state
+rm -f /tmp/zoom-guard.state /tmp/battery-throttle.state /tmp/ollama-guard.state /tmp/front-guard.state
 
 echo ""
 echo "==> Done. Logs were left at ~/Library/Logs/ — delete manually if desired."

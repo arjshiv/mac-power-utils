@@ -10,6 +10,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `zoom-guard.sh` | Quits idle Zoom after 5 minutes, throttles during calls on battery, cleans up orphaned processes |
 | `battery-throttle.sh` | Enables Low Power Mode on battery, renices heavy processes, reverts on AC |
 | `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
+| `front-guard.sh` | Restarts Front when backgrounded and bloated to reclaim leaked memory |
 
 ## Requirements
 
@@ -57,6 +58,10 @@ Detects battery/AC transitions and:
 
 Watches for loaded Ollama models sitting idle (no active generation). After 10 minutes of inactivity, unloads models via the API to reclaim memory. A single loaded model can consume 4-24 GB depending on size. Models reload in seconds on the next query, so there's minimal cost to unloading.
 
+### front-guard
+
+Front (Electron email client) leaks memory over time — a single renderer can grow to 500 MB+ while backgrounded. This guard detects when Front has no visible windows, isn't frontmost, and has exceeded a memory threshold (default 512 MB) for 15 minutes, then quits and relaunches it in the background. Safe because Front reconnects and resyncs on launch. Won't restart if you're actively composing.
+
 ## Logs
 
 All daemons log to `~/Library/Logs/`:
@@ -64,6 +69,7 @@ All daemons log to `~/Library/Logs/`:
 - `zoom-guard.log`
 - `battery-throttle.log`
 - `ollama-guard.log`
+- `front-guard.log`
 
 ## How They Interact
 
@@ -79,6 +85,8 @@ zoom-guard.sh ────────┬── kills idle Zoom (battery and AC)
                       └── extra renice during calls (battery only)
 
 ollama-guard.sh ──────── unloads idle models (battery and AC)
+
+front-guard.sh ───────── restarts bloated Front when backgrounded
 ```
 
 ## License
