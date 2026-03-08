@@ -10,6 +10,7 @@ usage() {
     cat <<'USAGE'
 Usage:
   mpuctl.sh status
+  mpuctl.sh check
   mpuctl.sh start <agent|all>
   mpuctl.sh stop <agent|all>
   mpuctl.sh restart <agent|all>
@@ -237,12 +238,80 @@ run_sanity() {
     "$SCRIPT_DIR/thermal-sanity.sh"
 }
 
+run_check() {
+    local ok=0
+    local config_path="$HOME/.config/mac-power-utils/mac-power-utils.conf"
+    local required_tools=(launchctl pmset pgrep awk sed tail)
+    local required_scripts=(
+        "edge-mem-guard.sh"
+        "zoom-guard.sh"
+        "battery-throttle.sh"
+        "ollama-guard.sh"
+        "front-guard.sh"
+        "thermal-sanity.sh"
+    )
+
+    echo "Checking environment..."
+
+    local tool
+    for tool in "${required_tools[@]}"; do
+        if command -v "$tool" >/dev/null 2>&1; then
+            echo "  [ok] tool: $tool"
+        else
+            echo "  [fail] missing tool: $tool"
+            ok=1
+        fi
+    done
+
+    if [[ -f "$config_path" ]]; then
+        echo "  [ok] config: $config_path"
+    else
+        echo "  [warn] config not found: $config_path"
+    fi
+
+    local agent
+    for agent in "${AGENTS[@]}"; do
+        local plist
+        plist="$(agent_to_plist "$agent")"
+        if [[ -f "$LAUNCH_AGENTS_DIR/$plist" ]]; then
+            echo "  [ok] launch agent: $plist"
+        else
+            echo "  [warn] launch agent missing: $LAUNCH_AGENTS_DIR/$plist"
+        fi
+    done
+
+    local script
+    for script in "${required_scripts[@]}"; do
+        if [[ -x "$SCRIPT_DIR/$script" ]]; then
+            echo "  [ok] script: $SCRIPT_DIR/$script"
+        else
+            echo "  [warn] script missing or not executable: $SCRIPT_DIR/$script"
+        fi
+    done
+
+    if [[ -d "$LOG_DIR" ]]; then
+        echo "  [ok] log dir: $LOG_DIR"
+    else
+        echo "  [warn] log dir missing: $LOG_DIR"
+    fi
+
+    if [[ "$ok" -eq 0 ]]; then
+        echo "Check complete: core requirements look good."
+    else
+        echo "Check complete: one or more hard failures found."
+        return 1
+    fi
+}
+
 main() {
     local cmd="${1:-}"
 
     case "$cmd" in
         status)
             status_agents
+            ;;
+        check)
+            run_check
             ;;
         start)
             [[ $# -ge 2 ]] || {

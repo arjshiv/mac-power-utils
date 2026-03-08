@@ -95,6 +95,9 @@ Use `~/bin/mpuctl.sh` instead of manual `launchctl` commands:
 # show all agents, load state, pid, and log path
 mpuctl.sh status
 
+# preflight checks (tools/config/plists/scripts)
+mpuctl.sh check
+
 # restart one daemon
 mpuctl.sh restart edge
 
