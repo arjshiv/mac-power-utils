@@ -19,7 +19,7 @@ Usage:
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent|all>
   mpuctl.sh cleanup
-  mpuctl.sh sanity
+  mpuctl.sh sanity [--json]
   mpuctl.sh diagnostics [output-dir]
 
 Agents:
@@ -308,7 +308,7 @@ collect_diagnostics() {
 }
 
 run_sanity() {
-    "$SCRIPT_DIR/thermal-sanity.sh"
+    "$SCRIPT_DIR/thermal-sanity.sh" "$@"
 }
 
 cleanup_runtime_state() {
@@ -492,7 +492,7 @@ main() {
             collect_diagnostics "${2:-$PWD}"
             ;;
         sanity)
-            run_sanity
+            run_sanity "${2:-}"
             ;;
         *)
             usage
