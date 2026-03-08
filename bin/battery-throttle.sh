@@ -1,9 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-CHECK_INTERVAL=60
+CONFIG_FILE="${MAC_POWER_UTILS_CONFIG:-$HOME/.config/mac-power-utils/mac-power-utils.conf}"
 STATE_FILE="/tmp/battery-throttle.state"
 LOG_FILE="$HOME/Library/Logs/battery-throttle.log"
+
+load_config() {
+    [[ -f "$CONFIG_FILE" ]] || return 0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        key="${key//[[:space:]]/}"
+
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+        if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+
+        if [[ -z "${!key+x}" ]]; then
+            printf -v "$key" "%s" "$value"
+        fi
+    done < "$CONFIG_FILE"
+}
+
+load_config
+
+CHECK_INTERVAL="${BATTERY_THROTTLE_CHECK_INTERVAL_SEC:-60}"
+EDGE_BATTERY_PRIORITY="${BATTERY_THROTTLE_EDGE_PRIORITY:-10}"
+ZOOM_BATTERY_PRIORITY="${BATTERY_THROTTLE_ZOOM_PRIORITY:-10}"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [battery-throttle] $*" >> "$LOG_FILE"
@@ -47,15 +76,15 @@ apply_battery_mode() {
     local edge_pids
     edge_pids=$(pgrep -f "Microsoft Edge.*--type=renderer" 2>/dev/null || true)
     if [[ -n "$edge_pids" ]]; then
-        renice_pids 10 $edge_pids
-        log "Reniced Edge renderer processes to 10"
+        renice_pids "$EDGE_BATTERY_PRIORITY" $edge_pids
+        log "Reniced Edge renderer processes to $EDGE_BATTERY_PRIORITY"
     fi
 
     local zoom_pid
     zoom_pid=$(pgrep -x "zoom.us" 2>/dev/null || true)
     if [[ -n "$zoom_pid" ]]; then
-        renice_pids 10 $zoom_pid
-        log "Reniced Zoom to 10"
+        renice_pids "$ZOOM_BATTERY_PRIORITY" $zoom_pid
+        log "Reniced Zoom to $ZOOM_BATTERY_PRIORITY"
     fi
 
     notify "On battery — throttling enabled"
@@ -87,7 +116,7 @@ apply_ac_mode() {
     set_state "ac"
 }
 
-log "Started"
+log "Started check_interval=${CHECK_INTERVAL}s edge_priority=${EDGE_BATTERY_PRIORITY} zoom_priority=${ZOOM_BATTERY_PRIORITY} config=${CONFIG_FILE}"
 
 while true; do
     last_state=$(get_last_state)

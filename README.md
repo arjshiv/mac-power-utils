@@ -25,9 +25,10 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 
 This will:
 1. Copy scripts to `~/bin/` and make them executable
-2. Install launchd agents to `~/Library/LaunchAgents/`
-3. Load all agents immediately
-4. Optionally configure passwordless `pmset` for battery throttling
+2. Install default config at `~/.config/mac-power-utils/mac-power-utils.conf` (keeps existing file if present)
+3. Install launchd agents to `~/Library/LaunchAgents/`
+4. Load all agents immediately
+5. Optionally configure passwordless `pmset` for battery throttling
 
 ## Uninstall
 
@@ -61,6 +62,28 @@ Watches for loaded Ollama models sitting idle (no active generation). After 10 m
 ### front-guard
 
 Front (Electron email client) leaks memory over time — a single renderer can grow to 500 MB+ while backgrounded. This guard detects when Front has no visible windows, isn't frontmost, and has exceeded a memory threshold (default 512 MB) for 15 minutes, then quits and relaunches it in the background. Safe because Front reconnects and resyncs on launch. Won't restart if you're actively composing.
+
+## Configuration
+
+All daemon settings are centralized in:
+
+```bash
+~/.config/mac-power-utils/mac-power-utils.conf
+```
+
+You can tune thresholds/intervals per guard there without editing scripts. Example:
+
+```bash
+EDGE_MEM_GUARD_THRESHOLD_MB=6144
+ZOOM_GUARD_IDLE_TIMEOUT_MIN=8
+OLLAMA_GUARD_IDLE_TIMEOUT_MIN=5
+```
+
+After changing config, re-run:
+
+```bash
+./install.sh
+```
 
 ## Logs
 

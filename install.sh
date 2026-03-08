@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+CONFIG_DIR="$HOME/.config/mac-power-utils"
+CONFIG_FILE="$CONFIG_DIR/mac-power-utils.conf"
 SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh)
 PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
 
@@ -11,6 +13,7 @@ echo "==> Installing mac-power-utils"
 
 mkdir -p "$BIN_DIR"
 mkdir -p "$LAUNCH_AGENTS_DIR"
+mkdir -p "$CONFIG_DIR"
 
 echo "==> Copying scripts to $BIN_DIR"
 for script in "${SCRIPTS[@]}"; do
@@ -18,6 +21,14 @@ for script in "${SCRIPTS[@]}"; do
     chmod +x "$BIN_DIR/$script"
     echo "    Installed $script"
 done
+
+echo "==> Installing default config"
+if [[ -f "$CONFIG_FILE" ]]; then
+    echo "    Keeping existing config: $CONFIG_FILE"
+else
+    cp "$SCRIPT_DIR/config/mac-power-utils.conf" "$CONFIG_FILE"
+    echo "    Installed $CONFIG_FILE"
+fi
 
 echo "==> Installing launchd agents"
 for plist in "${PLISTS[@]}"; do
@@ -41,4 +52,5 @@ echo "    And add this line:"
 echo "    $(whoami) ALL=(ALL) NOPASSWD: /usr/bin/pmset"
 echo ""
 
-echo "==> Done. Logs at ~/Library/Logs/{edge-mem-guard,zoom-guard,battery-throttle,ollama-guard,front-guard}.log"
+echo "==> Done. Config at $CONFIG_FILE"
+echo "==> Logs at ~/Library/Logs/{edge-mem-guard,zoom-guard,battery-throttle,ollama-guard,front-guard}.log"

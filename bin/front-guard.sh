@@ -1,11 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MEMORY_THRESHOLD_MB="${FRONT_MEMORY_THRESHOLD_MB:-512}"
-BACKGROUND_TIMEOUT_MIN="${FRONT_BACKGROUND_TIMEOUT_MIN:-15}"
-CHECK_INTERVAL=30
+CONFIG_FILE="${MAC_POWER_UTILS_CONFIG:-$HOME/.config/mac-power-utils/mac-power-utils.conf}"
 STATE_FILE="/tmp/front-guard.state"
 LOG_FILE="$HOME/Library/Logs/front-guard.log"
+
+load_config() {
+    [[ -f "$CONFIG_FILE" ]] || return 0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        key="${key//[[:space:]]/}"
+
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+        if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+
+        if [[ -z "${!key+x}" ]]; then
+            printf -v "$key" "%s" "$value"
+        fi
+    done < "$CONFIG_FILE"
+}
+
+load_config
+
+MEMORY_THRESHOLD_MB="${FRONT_MEMORY_THRESHOLD_MB:-${FRONT_GUARD_MEMORY_THRESHOLD_MB:-512}}"
+BACKGROUND_TIMEOUT_MIN="${FRONT_BACKGROUND_TIMEOUT_MIN:-${FRONT_GUARD_BACKGROUND_TIMEOUT_MIN:-15}}"
+CHECK_INTERVAL="${FRONT_GUARD_CHECK_INTERVAL_SEC:-30}"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [front-guard] $*" >> "$LOG_FILE"
@@ -80,7 +107,7 @@ restart_front() {
     clear_background_start
 }
 
-log "Started with memory_threshold=${MEMORY_THRESHOLD_MB}MB, background_timeout=${BACKGROUND_TIMEOUT_MIN}min"
+log "Started with memory_threshold=${MEMORY_THRESHOLD_MB}MB background_timeout=${BACKGROUND_TIMEOUT_MIN}min check_interval=${CHECK_INTERVAL}s config=${CONFIG_FILE}"
 
 while true; do
     if ! is_front_running; then

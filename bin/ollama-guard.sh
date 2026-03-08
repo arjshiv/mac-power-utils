@@ -1,11 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IDLE_TIMEOUT_MIN="${OLLAMA_IDLE_TIMEOUT_MIN:-10}"
-CHECK_INTERVAL=30
+CONFIG_FILE="${MAC_POWER_UTILS_CONFIG:-$HOME/.config/mac-power-utils/mac-power-utils.conf}"
 STATE_FILE="/tmp/ollama-guard.state"
 LOG_FILE="$HOME/Library/Logs/ollama-guard.log"
-API_URL="http://localhost:11434"
+
+load_config() {
+    [[ -f "$CONFIG_FILE" ]] || return 0
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        [[ -z "$line" || "$line" == \#* ]] && continue
+
+        local key="${line%%=*}"
+        local value="${line#*=}"
+        key="${key//[[:space:]]/}"
+
+        [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+
+        if [[ "$value" =~ ^\".*\"$ || "$value" =~ ^\'.*\'$ ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+
+        if [[ -z "${!key+x}" ]]; then
+            printf -v "$key" "%s" "$value"
+        fi
+    done < "$CONFIG_FILE"
+}
+
+load_config
+
+IDLE_TIMEOUT_MIN="${OLLAMA_IDLE_TIMEOUT_MIN:-${OLLAMA_GUARD_IDLE_TIMEOUT_MIN:-10}}"
+CHECK_INTERVAL="${OLLAMA_GUARD_CHECK_INTERVAL_SEC:-30}"
+API_URL="${OLLAMA_GUARD_API_URL:-http://localhost:11434}"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [ollama-guard] $*" >> "$LOG_FILE"
@@ -76,7 +103,7 @@ clear_idle() {
     echo "0" > "$STATE_FILE"
 }
 
-log "Started with idle_timeout=${IDLE_TIMEOUT_MIN}min"
+log "Started with idle_timeout=${IDLE_TIMEOUT_MIN}min check_interval=${CHECK_INTERVAL}s api_url=${API_URL} config=${CONFIG_FILE}"
 
 while true; do
     models=$(get_loaded_models)
