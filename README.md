@@ -97,6 +97,7 @@ mpuctl.sh status
 
 # preflight checks (tools/config/plists/scripts)
 mpuctl.sh check
+mpuctl.sh config
 
 # restart one daemon
 mpuctl.sh restart edge

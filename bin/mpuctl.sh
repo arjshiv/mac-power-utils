@@ -15,6 +15,7 @@ Usage:
   mpuctl.sh stop <agent|all>
   mpuctl.sh restart <agent|all>
   mpuctl.sh reload <agent|all>
+  mpuctl.sh config
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent|all>
   mpuctl.sh cleanup
@@ -414,6 +415,20 @@ run_check() {
     fi
 }
 
+show_config() {
+    local config_path="$HOME/.config/mac-power-utils/mac-power-utils.conf"
+    echo "Config path: $config_path"
+
+    if [[ ! -f "$config_path" ]]; then
+        echo "Config file not found. Run ./install.sh to create defaults."
+        return 1
+    fi
+
+    echo ""
+    echo "Active values:"
+    sed -n 's/^[[:space:]]*//; /^[#]/d; /^$/d; p' "$config_path"
+}
+
 main() {
     local cmd="${1:-}"
 
@@ -452,6 +467,9 @@ main() {
                 exit 1
             }
             reload_agents "$2"
+            ;;
+        config)
+            show_config
             ;;
         logs)
             [[ $# -ge 2 ]] || {
