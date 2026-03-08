@@ -14,6 +14,7 @@ Usage:
   mpuctl.sh restart <agent|all>
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent>
+  mpuctl.sh diagnostics [output-dir]
 
 Agents:
   edge | zoom | battery | ollama | front | all
@@ -181,6 +182,55 @@ tail_logs() {
     tail -f "$log_path"
 }
 
+collect_diagnostics() {
+    local output_dir="${1:-$PWD}"
+    local timestamp
+    timestamp="$(date '+%Y%m%d-%H%M%S')"
+    local bundle_name="mac-power-utils-diagnostics-${timestamp}"
+    local tmp_dir
+    tmp_dir="$(mktemp -d "/tmp/${bundle_name}.XXXXXX")"
+    local bundle_path="${output_dir}/${bundle_name}.tar.gz"
+
+    mkdir -p "$tmp_dir/logs"
+    mkdir -p "$output_dir"
+
+    {
+        echo "timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+        echo "user=$(whoami)"
+        echo "host=$(hostname)"
+        echo "shell=$SHELL"
+    } > "$tmp_dir/meta.txt"
+
+    sw_vers > "$tmp_dir/sw_vers.txt" 2>&1 || true
+    uname -a > "$tmp_dir/uname.txt" 2>&1 || true
+    pmset -g batt > "$tmp_dir/pmset-batt.txt" 2>&1 || true
+    pmset -g therm > "$tmp_dir/pmset-therm.txt" 2>&1 || true
+    launchctl list > "$tmp_dir/launchctl-list.txt" 2>&1 || true
+    status_agents > "$tmp_dir/agents-status.txt" 2>&1 || true
+
+    local config_path="$HOME/.config/mac-power-utils/mac-power-utils.conf"
+    if [[ -f "$config_path" ]]; then
+        cp "$config_path" "$tmp_dir/config.conf"
+    else
+        echo "No config file found at $config_path" > "$tmp_dir/config.conf"
+    fi
+
+    local agent
+    for agent in "${AGENTS[@]}"; do
+        local log_path
+        log_path="$(agent_to_log "$agent")"
+        if [[ -f "$log_path" ]]; then
+            tail -n 400 "$log_path" > "$tmp_dir/logs/${agent}.log" 2>&1 || true
+        else
+            echo "No log file yet: $log_path" > "$tmp_dir/logs/${agent}.log"
+        fi
+    done
+
+    tar -czf "$bundle_path" -C "$tmp_dir" .
+    rm -rf "$tmp_dir"
+    echo "Wrote diagnostics bundle: $bundle_path"
+}
+
 main() {
     local cmd="${1:-}"
 
@@ -223,6 +273,9 @@ main() {
                 exit 1
             }
             tail_logs "$2"
+            ;;
+        diagnostics)
+            collect_diagnostics "${2:-$PWD}"
             ;;
         *)
             usage

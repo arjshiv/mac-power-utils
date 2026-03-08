@@ -104,6 +104,9 @@ mpuctl.sh start all
 # inspect logs
 mpuctl.sh logs zoom 120
 mpuctl.sh tail battery
+
+# collect diagnostics bundle (config + status + power + recent logs)
+mpuctl.sh diagnostics ~/Desktop
 ```
 
 ## Logs
