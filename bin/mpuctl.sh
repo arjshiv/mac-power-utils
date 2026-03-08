@@ -14,6 +14,7 @@ Usage:
   mpuctl.sh start <agent|all>
   mpuctl.sh stop <agent|all>
   mpuctl.sh restart <agent|all>
+  mpuctl.sh reload <agent|all>
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent|all>
   mpuctl.sh cleanup
@@ -122,6 +123,40 @@ stop_agents() {
     fi
 
     unload_agent "$target"
+}
+
+reload_agent() {
+    local agent="$1"
+    local plist label
+
+    plist="$(agent_to_plist "$agent")" || {
+        echo "Unknown agent: $agent" >&2
+        return 1
+    }
+    label="${plist%.plist}"
+
+    if is_loaded "$label"; then
+        local domain_target="gui/$(id -u)/$label"
+        if launchctl kickstart -k "$domain_target" >/dev/null 2>&1; then
+            echo "Reloaded $agent"
+            return 0
+        fi
+    fi
+
+    load_agent "$agent"
+}
+
+reload_agents() {
+    local target="$1"
+    if [[ "$target" == "all" ]]; then
+        local agent
+        for agent in "${AGENTS[@]}"; do
+            reload_agent "$agent"
+        done
+        return 0
+    fi
+
+    reload_agent "$target"
 }
 
 status_agents() {
@@ -410,6 +445,13 @@ main() {
             }
             stop_agents "$2"
             start_agents "$2"
+            ;;
+        reload)
+            [[ $# -ge 2 ]] || {
+                usage
+                exit 1
+            }
+            reload_agents "$2"
             ;;
         logs)
             [[ $# -ge 2 ]] || {

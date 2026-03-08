@@ -100,6 +100,7 @@ mpuctl.sh check
 
 # restart one daemon
 mpuctl.sh restart edge
+mpuctl.sh reload edge
 
 # stop or start everything
 mpuctl.sh stop all
