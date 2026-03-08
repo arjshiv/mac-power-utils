@@ -11,6 +11,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `battery-throttle.sh` | Enables Low Power Mode on battery, renices heavy processes, reverts on AC |
 | `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
 | `front-guard.sh` | Restarts Front when backgrounded and bloated to reclaim leaked memory |
+| `mpuctl.sh` | One command for service status/start/stop/restart/logs |
 
 ## Requirements
 
@@ -83,6 +84,26 @@ After changing config, re-run:
 
 ```bash
 ./install.sh
+```
+
+## Service Control
+
+Use `~/bin/mpuctl.sh` instead of manual `launchctl` commands:
+
+```bash
+# show all agents, load state, pid, and log path
+mpuctl.sh status
+
+# restart one daemon
+mpuctl.sh restart edge
+
+# stop or start everything
+mpuctl.sh stop all
+mpuctl.sh start all
+
+# inspect logs
+mpuctl.sh logs zoom 120
+mpuctl.sh tail battery
 ```
 
 ## Logs
