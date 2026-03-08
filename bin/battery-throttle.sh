@@ -33,9 +33,35 @@ load_config
 CHECK_INTERVAL="${BATTERY_THROTTLE_CHECK_INTERVAL_SEC:-60}"
 EDGE_BATTERY_PRIORITY="${BATTERY_THROTTLE_EDGE_PRIORITY:-10}"
 ZOOM_BATTERY_PRIORITY="${BATTERY_THROTTLE_ZOOM_PRIORITY:-10}"
+LOCK_DIR="/tmp/battery-throttle.lock"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [battery-throttle] $*" >> "$LOG_FILE"
+}
+
+acquire_lock() {
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    local existing_pid
+    existing_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "Another instance is already running (pid=$existing_pid), exiting"
+        exit 0
+    fi
+
+    rm -rf "$LOCK_DIR" 2>/dev/null || true
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    log "Failed to acquire lock at $LOCK_DIR"
+    exit 1
 }
 
 notify() {
@@ -116,6 +142,7 @@ apply_ac_mode() {
     set_state "ac"
 }
 
+acquire_lock
 log "Started check_interval=${CHECK_INTERVAL}s edge_priority=${EDGE_BATTERY_PRIORITY} zoom_priority=${ZOOM_BATTERY_PRIORITY} config=${CONFIG_FILE}"
 
 while true; do

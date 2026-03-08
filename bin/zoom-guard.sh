@@ -33,9 +33,35 @@ load_config
 IDLE_TIMEOUT_MIN="${IDLE_TIMEOUT_MIN:-${ZOOM_GUARD_IDLE_TIMEOUT_MIN:-5}}"
 THROTTLE_ON_BATTERY="${THROTTLE_ON_BATTERY:-${ZOOM_GUARD_THROTTLE_ON_BATTERY:-true}}"
 CHECK_INTERVAL="${ZOOM_GUARD_CHECK_INTERVAL_SEC:-15}"
+LOCK_DIR="/tmp/zoom-guard.lock"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [zoom-guard] $*" >> "$LOG_FILE"
+}
+
+acquire_lock() {
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    local existing_pid
+    existing_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "Another instance is already running (pid=$existing_pid), exiting"
+        exit 0
+    fi
+
+    rm -rf "$LOCK_DIR" 2>/dev/null || true
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    log "Failed to acquire lock at $LOCK_DIR"
+    exit 1
 }
 
 notify() {
@@ -114,6 +140,7 @@ cleanup_stale_cpthost() {
     fi
 }
 
+acquire_lock
 log "Started with idle_timeout=${IDLE_TIMEOUT_MIN}min throttle_on_battery=${THROTTLE_ON_BATTERY} check_interval=${CHECK_INTERVAL}s config=${CONFIG_FILE}"
 
 while true; do

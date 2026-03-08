@@ -30,6 +30,7 @@ sudo pmset -b lowpowermode 0 2>/dev/null || true
 
 echo "==> Cleaning up state files"
 rm -f /tmp/zoom-guard.state /tmp/battery-throttle.state /tmp/ollama-guard.state /tmp/front-guard.state
+rm -rf /tmp/edge-mem-guard.lock /tmp/zoom-guard.lock /tmp/battery-throttle.lock /tmp/ollama-guard.lock /tmp/front-guard.lock
 
 echo ""
 echo "==> Done. Logs were left at ~/Library/Logs/ — delete manually if desired."

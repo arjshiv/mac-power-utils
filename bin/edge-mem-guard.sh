@@ -32,9 +32,35 @@ load_config
 THRESHOLD_MB="${1:-${EDGE_MEM_GUARD_THRESHOLD_MB:-4096}}"
 WARN_PCT="${EDGE_MEM_GUARD_WARN_PCT:-80}"
 CHECK_INTERVAL="${EDGE_MEM_GUARD_CHECK_INTERVAL_SEC:-30}"
+LOCK_DIR="/tmp/edge-mem-guard.lock"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [edge-mem-guard] $*" >> "$LOG_FILE"
+}
+
+acquire_lock() {
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    local existing_pid
+    existing_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+    if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "Another instance is already running (pid=$existing_pid), exiting"
+        exit 0
+    fi
+
+    rm -rf "$LOCK_DIR" 2>/dev/null || true
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+        echo "$$" > "$LOCK_DIR/pid"
+        trap 'rm -rf "$LOCK_DIR"' EXIT INT TERM
+        return
+    fi
+
+    log "Failed to acquire lock at $LOCK_DIR"
+    exit 1
 }
 
 notify() {
@@ -67,6 +93,7 @@ kill_renderers() {
     sleep 5
 }
 
+acquire_lock
 log "Started with threshold=${THRESHOLD_MB}MB warn_pct=${WARN_PCT} check_interval=${CHECK_INTERVAL}s config=${CONFIG_FILE}"
 
 while true; do

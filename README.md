@@ -115,6 +115,8 @@ All daemons log to `~/Library/Logs/`:
 - `ollama-guard.log`
 - `front-guard.log`
 
+Each daemon also uses a lock directory under `/tmp` to prevent duplicate instances.
+
 ## How They Interact
 
 ```
