@@ -16,6 +16,7 @@ Usage:
   mpuctl.sh restart <agent|all>
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent|all>
+  mpuctl.sh cleanup
   mpuctl.sh sanity
   mpuctl.sh diagnostics [output-dir]
 
@@ -274,6 +275,45 @@ run_sanity() {
     "$SCRIPT_DIR/thermal-sanity.sh"
 }
 
+cleanup_runtime_state() {
+    local state_files=(
+        "/tmp/zoom-guard.state"
+        "/tmp/battery-throttle.state"
+        "/tmp/ollama-guard.state"
+        "/tmp/front-guard.state"
+    )
+    local lock_dirs=(
+        "/tmp/edge-mem-guard.lock"
+        "/tmp/zoom-guard.lock"
+        "/tmp/battery-throttle.lock"
+        "/tmp/ollama-guard.lock"
+        "/tmp/front-guard.lock"
+    )
+    local removed=0
+
+    local file
+    for file in "${state_files[@]}"; do
+        if [[ -e "$file" ]]; then
+            rm -f "$file"
+            echo "Removed state file: $file"
+            removed=$((removed + 1))
+        fi
+    done
+
+    local lock
+    for lock in "${lock_dirs[@]}"; do
+        if [[ -d "$lock" ]]; then
+            rm -rf "$lock"
+            echo "Removed lock dir: $lock"
+            removed=$((removed + 1))
+        fi
+    done
+
+    if [[ "$removed" -eq 0 ]]; then
+        echo "No runtime state files or lock dirs found."
+    fi
+}
+
 run_check() {
     local ok=0
     local config_path="$HOME/.config/mac-power-utils/mac-power-utils.conf"
@@ -384,6 +424,9 @@ main() {
                 exit 1
             }
             tail_logs "$2"
+            ;;
+        cleanup)
+            cleanup_runtime_state
             ;;
         diagnostics)
             collect_diagnostics "${2:-$PWD}"

@@ -114,6 +114,9 @@ mpuctl.sh tail all
 # quick thermal sanity + what to run
 mpuctl.sh sanity
 
+# clear stale state/lock files in /tmp
+mpuctl.sh cleanup
+
 # collect diagnostics bundle (config + status + power + recent logs)
 mpuctl.sh diagnostics ~/Desktop
 ```
