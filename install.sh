@@ -7,7 +7,7 @@ LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 LOG_DIR="$HOME/Library/Logs"
 CONFIG_DIR="$HOME/.config/mac-power-utils"
 CONFIG_FILE="$CONFIG_DIR/mac-power-utils.conf"
-SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh thermal-sanity.sh)
+SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh mpuctl thermal-sanity.sh)
 PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
 LOG_FILES=(edge-mem-guard.log zoom-guard.log battery-throttle.log ollama-guard.log front-guard.log)
 

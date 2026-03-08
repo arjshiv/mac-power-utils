@@ -11,7 +11,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `battery-throttle.sh` | Enables Low Power Mode on battery, renices heavy processes, reverts on AC |
 | `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
 | `front-guard.sh` | Restarts Front when backgrounded and bloated to reclaim leaked memory |
-| `mpuctl.sh` | One command for service status/start/stop/restart/logs |
+| `mpuctl` | One command for service status/start/stop/restart/logs |
 | `thermal-sanity.sh` | Quick thermal/power/fan snapshot with run recommendations |
 
 ## Requirements
@@ -90,40 +90,40 @@ After changing config, re-run:
 
 ## Service Control
 
-Use `~/bin/mpuctl.sh` instead of manual `launchctl` commands:
+Use `~/bin/mpuctl` instead of manual `launchctl` commands:
 
 ```bash
 # show all agents, load state, pid, and log path
-mpuctl.sh status
+mpuctl status
 
 # preflight checks (tools/config/plists/scripts)
-mpuctl.sh check
-mpuctl.sh config
+mpuctl check
+mpuctl config
 
 # restart one daemon
-mpuctl.sh restart edge
-mpuctl.sh reload edge
+mpuctl restart edge
+mpuctl reload edge
 
 # stop or start everything
-mpuctl.sh stop all
-mpuctl.sh start all
+mpuctl stop all
+mpuctl start all
 
 # inspect logs
-mpuctl.sh logs zoom 120
-mpuctl.sh logs all 40
-mpuctl.sh tail battery
-mpuctl.sh tail all
+mpuctl logs zoom 120
+mpuctl logs all 40
+mpuctl tail battery
+mpuctl tail all
 
 # quick thermal sanity + what to run
-mpuctl.sh sanity
-mpuctl.sh sanity --json
+mpuctl sanity
+mpuctl sanity --json
 thermal-sanity.sh --json
 
 # clear stale state/lock files in /tmp
-mpuctl.sh cleanup
+mpuctl cleanup
 
 # collect diagnostics bundle (config + status + power + recent logs)
-mpuctl.sh diagnostics ~/Desktop
+mpuctl diagnostics ~/Desktop
 ```
 
 ## Logs
