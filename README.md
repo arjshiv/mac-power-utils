@@ -28,9 +28,10 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 This will:
 1. Copy scripts to `~/bin/` and make them executable
 2. Install default config at `~/.config/mac-power-utils/mac-power-utils.conf` (keeps existing file if present)
-3. Install launchd agents to `~/Library/LaunchAgents/`
-4. Load all agents immediately
-5. Optionally configure passwordless `pmset` for battery throttling
+3. Ensure log files exist at `~/Library/Logs/`
+4. Install launchd agents to `~/Library/LaunchAgents/`
+5. Load all agents immediately
+6. Optionally configure passwordless `pmset` for battery throttling
 
 ## Uninstall
 

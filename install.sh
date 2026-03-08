@@ -4,15 +4,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+LOG_DIR="$HOME/Library/Logs"
 CONFIG_DIR="$HOME/.config/mac-power-utils"
 CONFIG_FILE="$CONFIG_DIR/mac-power-utils.conf"
 SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh thermal-sanity.sh)
 PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
+LOG_FILES=(edge-mem-guard.log zoom-guard.log battery-throttle.log ollama-guard.log front-guard.log)
 
 echo "==> Installing mac-power-utils"
 
 mkdir -p "$BIN_DIR"
 mkdir -p "$LAUNCH_AGENTS_DIR"
+mkdir -p "$LOG_DIR"
 mkdir -p "$CONFIG_DIR"
 
 echo "==> Copying scripts to $BIN_DIR"
@@ -29,6 +32,13 @@ else
     cp "$SCRIPT_DIR/config/mac-power-utils.conf" "$CONFIG_FILE"
     echo "    Installed $CONFIG_FILE"
 fi
+
+echo "==> Ensuring log files exist"
+for logfile in "${LOG_FILES[@]}"; do
+    touch "$LOG_DIR/$logfile"
+    chmod 600 "$LOG_DIR/$logfile"
+    echo "    Ready $LOG_DIR/$logfile"
+done
 
 echo "==> Installing launchd agents"
 for plist in "${PLISTS[@]}"; do
