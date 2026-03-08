@@ -15,7 +15,7 @@ Usage:
   mpuctl.sh stop <agent|all>
   mpuctl.sh restart <agent|all>
   mpuctl.sh logs <agent> [lines]
-  mpuctl.sh tail <agent>
+  mpuctl.sh tail <agent|all>
   mpuctl.sh sanity
   mpuctl.sh diagnostics [output-dir]
 
@@ -187,6 +187,26 @@ print_logs() {
 tail_logs() {
     local agent="$1"
     local log_path
+
+    if [[ "$agent" == "all" ]]; then
+        local files=()
+        local each
+        for each in "${AGENTS[@]}"; do
+            local each_log
+            each_log="$(agent_to_log "$each")"
+            if [[ -f "$each_log" ]]; then
+                files+=("$each_log")
+            fi
+        done
+
+        if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "No log files yet for any agent." >&2
+            return 1
+        fi
+
+        tail -n 30 -F "${files[@]}"
+        return 0
+    fi
 
     log_path="$(agent_to_log "$agent")" || {
         echo "Unknown agent: $agent" >&2

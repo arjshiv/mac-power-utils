@@ -109,6 +109,7 @@ mpuctl.sh start all
 mpuctl.sh logs zoom 120
 mpuctl.sh logs all 40
 mpuctl.sh tail battery
+mpuctl.sh tail all
 
 # quick thermal sanity + what to run
 mpuctl.sh sanity
