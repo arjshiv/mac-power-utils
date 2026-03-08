@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 LOG_DIR="$HOME/Library/Logs"
 AGENTS=(edge zoom battery ollama front)
@@ -14,6 +15,7 @@ Usage:
   mpuctl.sh restart <agent|all>
   mpuctl.sh logs <agent> [lines]
   mpuctl.sh tail <agent>
+  mpuctl.sh sanity
   mpuctl.sh diagnostics [output-dir]
 
 Agents:
@@ -231,6 +233,10 @@ collect_diagnostics() {
     echo "Wrote diagnostics bundle: $bundle_path"
 }
 
+run_sanity() {
+    "$SCRIPT_DIR/thermal-sanity.sh"
+}
+
 main() {
     local cmd="${1:-}"
 
@@ -276,6 +282,9 @@ main() {
             ;;
         diagnostics)
             collect_diagnostics "${2:-$PWD}"
+            ;;
+        sanity)
+            run_sanity
             ;;
         *)
             usage

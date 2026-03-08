@@ -12,6 +12,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
 | `front-guard.sh` | Restarts Front when backgrounded and bloated to reclaim leaked memory |
 | `mpuctl.sh` | One command for service status/start/stop/restart/logs |
+| `thermal-sanity.sh` | Quick thermal/power/fan snapshot with run recommendations |
 
 ## Requirements
 
@@ -104,6 +105,9 @@ mpuctl.sh start all
 # inspect logs
 mpuctl.sh logs zoom 120
 mpuctl.sh tail battery
+
+# quick thermal sanity + what to run
+mpuctl.sh sanity
 
 # collect diagnostics bundle (config + status + power + recent logs)
 mpuctl.sh diagnostics ~/Desktop
