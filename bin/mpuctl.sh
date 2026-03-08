@@ -155,6 +155,22 @@ print_logs() {
     local lines="${2:-80}"
     local log_path
 
+    if [[ "$agent" == "all" ]]; then
+        local each
+        for each in "${AGENTS[@]}"; do
+            local each_log
+            each_log="$(agent_to_log "$each")"
+            echo "===== ${each} (${lines} lines) ====="
+            if [[ -f "$each_log" ]]; then
+                tail -n "$lines" "$each_log"
+            else
+                echo "No log file yet: $each_log"
+            fi
+            echo ""
+        done
+        return 0
+    fi
+
     log_path="$(agent_to_log "$agent")" || {
         echo "Unknown agent: $agent" >&2
         return 1
