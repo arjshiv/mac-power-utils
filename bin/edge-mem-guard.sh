@@ -32,6 +32,7 @@ load_config
 THRESHOLD_MB="${1:-${EDGE_MEM_GUARD_THRESHOLD_MB:-4096}}"
 WARN_PCT="${EDGE_MEM_GUARD_WARN_PCT:-80}"
 CHECK_INTERVAL="${EDGE_MEM_GUARD_CHECK_INTERVAL_SEC:-30}"
+KILL_AFTER_BREACHES="${EDGE_MEM_GUARD_KILL_AFTER_BREACHES:-2}"
 LOCK_DIR="/tmp/edge-mem-guard.lock"
 
 log() {
@@ -69,15 +70,19 @@ notify() {
 
 get_edge_memory_mb() {
     local total_kb
-    total_kb=$(ps -eo rss,comm 2>/dev/null \
-        | grep "Microsoft Edge" \
-        | awk '{sum += $1} END {print sum+0}')
+    total_kb=$(ps -axo rss=,command= 2>/dev/null \
+        | awk 'index($0, "Microsoft Edge") > 0 {sum += $1} END {print sum+0}')
     echo $(( total_kb / 1024 ))
+}
+
+get_renderer_pids() {
+    ps -axo pid=,command= 2>/dev/null \
+        | awk 'index($0, "Microsoft Edge") > 0 && index($0, "--type=renderer") > 0 {print $1}'
 }
 
 kill_renderers() {
     local pids
-    pids=$(pgrep -f "Microsoft Edge.*--type=renderer" 2>/dev/null || true)
+    pids="$(get_renderer_pids)"
     if [[ -z "$pids" ]]; then
         log "No renderer processes found to kill"
         return
@@ -88,13 +93,19 @@ kill_renderers() {
         kill -15 "$pid" 2>/dev/null && count=$((count + 1))
     done <<< "$pids"
 
-    log "Sent SIGTERM to $count renderer processes"
-    notify "Killed $count Edge tabs to free memory"
-    sleep 5
+    if [[ "$count" -gt 0 ]]; then
+        log "Sent SIGTERM to $count renderer processes"
+        notify "Killed $count Edge tabs to free memory"
+        sleep 5
+    else
+        log "Renderer processes were detected but no SIGTERM was delivered"
+    fi
 }
 
 acquire_lock
-log "Started with threshold=${THRESHOLD_MB}MB warn_pct=${WARN_PCT} check_interval=${CHECK_INTERVAL}s config=${CONFIG_FILE}"
+log "Started with threshold=${THRESHOLD_MB}MB warn_pct=${WARN_PCT} check_interval=${CHECK_INTERVAL}s kill_after_breaches=${KILL_AFTER_BREACHES} config=${CONFIG_FILE}"
+
+breach_count=0
 
 while true; do
     mem_mb=$(get_edge_memory_mb)
@@ -107,10 +118,18 @@ while true; do
     warn_threshold=$(( THRESHOLD_MB * WARN_PCT / 100 ))
 
     if [[ "$mem_mb" -gt "$THRESHOLD_MB" ]]; then
-        log "KILL: Edge using ${mem_mb}MB (threshold: ${THRESHOLD_MB}MB)"
-        kill_renderers
+        breach_count=$(( breach_count + 1 ))
+        log "BREACH: Edge using ${mem_mb}MB (threshold: ${THRESHOLD_MB}MB, consecutive=${breach_count}/${KILL_AFTER_BREACHES})"
+
+        if [[ "$breach_count" -ge "$KILL_AFTER_BREACHES" ]]; then
+            kill_renderers
+            breach_count=0
+        fi
     elif [[ "$mem_mb" -gt "$warn_threshold" ]]; then
+        breach_count=0
         log "WARN: Edge using ${mem_mb}MB (${WARN_PCT}% of ${THRESHOLD_MB}MB threshold)"
+    else
+        breach_count=0
     fi
 
     sleep "$CHECK_INTERVAL"

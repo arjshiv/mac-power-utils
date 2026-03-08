@@ -69,13 +69,31 @@ notify() {
 }
 
 is_front_running() {
-    pgrep -x "Front" >/dev/null 2>&1
+    [[ -n "$(get_front_pids)" ]]
+}
+
+get_front_pids() {
+    pgrep -x "Front" 2>/dev/null || true
 }
 
 get_front_memory_mb() {
-    ps -eo rss,comm 2>/dev/null \
-        | grep "Front" \
-        | awk '{sum += $1} END {printf "%d", sum/1024}'
+    local pids
+    pids="$(get_front_pids)"
+    if [[ -z "$pids" ]]; then
+        echo "0"
+        return
+    fi
+
+    local total_kb=0
+    local pid
+    while IFS= read -r pid; do
+        [[ "$pid" =~ ^[0-9]+$ ]] || continue
+        local rss
+        rss="$(ps -o rss= -p "$pid" 2>/dev/null | awk '{print $1+0}')"
+        total_kb=$(( total_kb + rss ))
+    done <<< "$pids"
+
+    echo $(( total_kb / 1024 ))
 }
 
 is_frontmost() {

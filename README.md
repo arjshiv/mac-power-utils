@@ -41,7 +41,7 @@ This will:
 
 ### edge-mem-guard
 
-Monitors Edge memory usage every 30 seconds. When total RSS exceeds the threshold (default 4096 MB), it gracefully kills renderer processes. Affected tabs show a reload prompt — no data loss.
+Monitors Edge memory usage every 30 seconds. When total RSS exceeds the threshold (default 4096 MB) across consecutive checks, it gracefully kills renderer processes. Affected tabs show a reload prompt — no data loss.
 
 ### zoom-guard
 

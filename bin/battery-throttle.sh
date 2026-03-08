@@ -88,8 +88,21 @@ renice_pids() {
     local priority="$1"
     shift
     for pid in "$@"; do
+        [[ "$pid" =~ ^[0-9]+$ ]] || continue
         renice "$priority" -p "$pid" >/dev/null 2>&1 || true
     done
+}
+
+collect_edge_renderer_pids() {
+    ps -axo pid=,command= 2>/dev/null \
+        | awk 'index($0, "Microsoft Edge") > 0 && index($0, "--type=renderer") > 0 {print $1}'
+}
+
+collect_zoom_related_pids() {
+    (
+        pgrep -x "zoom.us" 2>/dev/null || true
+        pgrep -x "CptHost" 2>/dev/null || true
+    ) | awk 'NF {print $1}' | sort -u
 }
 
 apply_battery_mode() {
@@ -100,17 +113,17 @@ apply_battery_mode() {
         log "Failed to enable Low Power Mode (sudo needed)"
 
     local edge_pids
-    edge_pids=$(pgrep -f "Microsoft Edge.*--type=renderer" 2>/dev/null || true)
+    edge_pids="$(collect_edge_renderer_pids)"
     if [[ -n "$edge_pids" ]]; then
         renice_pids "$EDGE_BATTERY_PRIORITY" $edge_pids
         log "Reniced Edge renderer processes to $EDGE_BATTERY_PRIORITY"
     fi
 
-    local zoom_pid
-    zoom_pid=$(pgrep -x "zoom.us" 2>/dev/null || true)
-    if [[ -n "$zoom_pid" ]]; then
-        renice_pids "$ZOOM_BATTERY_PRIORITY" $zoom_pid
-        log "Reniced Zoom to $ZOOM_BATTERY_PRIORITY"
+    local zoom_pids
+    zoom_pids="$(collect_zoom_related_pids)"
+    if [[ -n "$zoom_pids" ]]; then
+        renice_pids "$ZOOM_BATTERY_PRIORITY" $zoom_pids
+        log "Reniced Zoom/CptHost processes to $ZOOM_BATTERY_PRIORITY"
     fi
 
     notify "On battery — throttling enabled"
@@ -125,17 +138,17 @@ apply_ac_mode() {
         log "Failed to disable Low Power Mode (sudo needed)"
 
     local edge_pids
-    edge_pids=$(pgrep -f "Microsoft Edge.*--type=renderer" 2>/dev/null || true)
+    edge_pids="$(collect_edge_renderer_pids)"
     if [[ -n "$edge_pids" ]]; then
         renice_pids 0 $edge_pids
         log "Restored Edge renderer processes to priority 0"
     fi
 
-    local zoom_pid
-    zoom_pid=$(pgrep -x "zoom.us" 2>/dev/null || true)
-    if [[ -n "$zoom_pid" ]]; then
-        renice_pids 0 $zoom_pid
-        log "Restored Zoom to priority 0"
+    local zoom_pids
+    zoom_pids="$(collect_zoom_related_pids)"
+    if [[ -n "$zoom_pids" ]]; then
+        renice_pids 0 $zoom_pids
+        log "Restored Zoom/CptHost processes to priority 0"
     fi
 
     notify "On AC power — full performance restored"
