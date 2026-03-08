@@ -115,6 +115,7 @@ mpuctl.sh tail all
 
 # quick thermal sanity + what to run
 mpuctl.sh sanity
+thermal-sanity.sh --json
 
 # clear stale state/lock files in /tmp
 mpuctl.sh cleanup

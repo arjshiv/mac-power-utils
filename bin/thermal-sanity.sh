@@ -122,9 +122,30 @@ print_bool() {
     fi
 }
 
+json_escape() {
+    printf "%s" "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+print_recommendations_json() {
+    local -n items_ref="$1"
+    local idx
+    printf "["
+    for idx in "${!items_ref[@]}"; do
+        if [[ "$idx" -gt 0 ]]; then
+            printf ","
+        fi
+        printf "\"%s\"" "$(json_escape "${items_ref[$idx]}")"
+    done
+    printf "]"
+}
+
 main() {
+    local output_mode="${1:-text}"
     local p_source batt_pct batt_state thermal_level cpu_limit sched_limit edge_mem_mb
     local zoom_active ollama_models fan_line
+    local edge_loaded zoom_loaded battery_loaded ollama_loaded front_loaded
+    local edge_warn_threshold
+    local recommendations=()
 
     p_source="$(power_source)"
     batt_pct="$(battery_percent)"
@@ -143,6 +164,75 @@ main() {
     ollama_models="$(ollama_loaded_model_count)"
     fan_line="$(fan_status)"
 
+    edge_loaded="false"
+    zoom_loaded="false"
+    battery_loaded="false"
+    ollama_loaded="false"
+    front_loaded="false"
+
+    agent_loaded "$LAUNCH_LABEL_EDGE" && edge_loaded="true"
+    agent_loaded "$LAUNCH_LABEL_ZOOM" && zoom_loaded="true"
+    agent_loaded "$LAUNCH_LABEL_BATTERY" && battery_loaded="true"
+    agent_loaded "$LAUNCH_LABEL_OLLAMA" && ollama_loaded="true"
+    agent_loaded "$LAUNCH_LABEL_FRONT" && front_loaded="true"
+    edge_warn_threshold=$(( EDGE_THRESHOLD_MB * EDGE_WARN_PCT / 100 ))
+
+    if [[ "${p_source:-}" == "Battery Power" ]] && [[ "$battery_loaded" != "true" ]]; then
+        recommendations+=("Start battery protections: mpuctl.sh start battery")
+    fi
+
+    if [[ "$edge_loaded" != "true" ]] && [[ "$zoom_loaded" != "true" ]] && [[ "$battery_loaded" != "true" ]] && [[ "$ollama_loaded" != "true" ]] && [[ "$front_loaded" != "true" ]]; then
+        recommendations+=("Baseline automation is off; enable all guards: mpuctl.sh start all")
+    fi
+
+    if [[ -n "${thermal_level:-}" && "${thermal_level}" =~ ^[0-9]+$ ]] && [[ "$thermal_level" -ge 1 ]]; then
+        recommendations+=("Thermal pressure detected (ThermalLevel=${thermal_level}); ensure battery throttle is active: mpuctl.sh start battery")
+    fi
+
+    if [[ -n "${cpu_limit:-}" && "${cpu_limit}" =~ ^[0-9]+$ ]] && [[ "$cpu_limit" -lt 100 ]]; then
+        recommendations+=("CPU speed is limited (${cpu_limit}%); reduce active load and keep throttling on")
+    fi
+
+    if [[ "$edge_mem_mb" -ge "$edge_warn_threshold" ]] && [[ "$edge_loaded" != "true" ]]; then
+        recommendations+=("Edge memory is high; enable guard: mpuctl.sh start edge")
+    fi
+
+    if [[ "$zoom_active" == "true" ]] && [[ "$zoom_loaded" != "true" ]]; then
+        recommendations+=("Zoom is running without guard; enable cleanup/throttling: mpuctl.sh start zoom")
+    fi
+
+    if [[ "$ollama_models" =~ ^[0-9]+$ ]] && [[ "$ollama_models" -gt 0 ]] && [[ "$ollama_loaded" != "true" ]]; then
+        recommendations+=("Ollama has loaded models; enable idle unloads: mpuctl.sh start ollama")
+    fi
+
+    if [[ "${#recommendations[@]}" -eq 0 ]]; then
+        recommendations+=("No immediate action needed. Current state looks healthy.")
+    fi
+
+    if [[ "$output_mode" == "--json" ]]; then
+        printf "{"
+        printf "\"power_source\":\"%s\"," "$(json_escape "${p_source:-unknown}")"
+        printf "\"battery_percent\":\"%s\"," "$(json_escape "${batt_pct:-n/a}")"
+        printf "\"battery_status\":\"%s\"," "$(json_escape "${batt_state:-unknown}")"
+        printf "\"thermal_level\":\"%s\"," "$(json_escape "${thermal_level:-n/a}")"
+        printf "\"cpu_speed_limit\":\"%s\"," "$(json_escape "${cpu_limit:-100}")"
+        printf "\"scheduler_limit\":\"%s\"," "$(json_escape "${sched_limit:-100}")"
+        printf "\"fan\":\"%s\"," "$(json_escape "$fan_line")"
+        printf "\"edge_memory_mb\":\"%s\"," "$(json_escape "$edge_mem_mb")"
+        printf "\"edge_threshold_mb\":\"%s\"," "$(json_escape "$EDGE_THRESHOLD_MB")"
+        printf "\"edge_warn_pct\":\"%s\"," "$(json_escape "$EDGE_WARN_PCT")"
+        printf "\"zoom_running\":\"%s\"," "$zoom_active"
+        printf "\"ollama_loaded_models\":\"%s\"," "$(json_escape "$ollama_models")"
+        printf "\"loaded_agents\":{"
+        printf "\"edge\":\"%s\",\"zoom\":\"%s\",\"battery\":\"%s\",\"ollama\":\"%s\",\"front\":\"%s\"" \
+            "$edge_loaded" "$zoom_loaded" "$battery_loaded" "$ollama_loaded" "$front_loaded"
+        printf "},"
+        printf "\"recommendations\":"
+        print_recommendations_json recommendations
+        printf "}\n"
+        return 0
+    fi
+
     echo "mac-power-utils sanity snapshot"
     echo "Power source: ${p_source:-unknown}"
     echo "Battery: ${batt_pct:-n/a}% (${batt_state:-unknown})"
@@ -155,65 +245,14 @@ main() {
     echo "Ollama loaded models: ${ollama_models}"
     echo ""
 
-    local edge_loaded zoom_loaded battery_loaded ollama_loaded front_loaded
-    edge_loaded="false"
-    zoom_loaded="false"
-    battery_loaded="false"
-    ollama_loaded="false"
-    front_loaded="false"
-
-    agent_loaded "$LAUNCH_LABEL_EDGE" && edge_loaded="true"
-    agent_loaded "$LAUNCH_LABEL_ZOOM" && zoom_loaded="true"
-    agent_loaded "$LAUNCH_LABEL_BATTERY" && battery_loaded="true"
-    agent_loaded "$LAUNCH_LABEL_OLLAMA" && ollama_loaded="true"
-    agent_loaded "$LAUNCH_LABEL_FRONT" && front_loaded="true"
-
     echo "Loaded agents: edge=$(print_bool "$edge_loaded"), zoom=$(print_bool "$zoom_loaded"), battery=$(print_bool "$battery_loaded"), ollama=$(print_bool "$ollama_loaded"), front=$(print_bool "$front_loaded")"
     echo ""
     echo "Recommendations:"
 
-    local rec_count=0
-    local edge_warn_threshold
-    edge_warn_threshold=$(( EDGE_THRESHOLD_MB * EDGE_WARN_PCT / 100 ))
-
-    if [[ "${p_source:-}" == "Battery Power" ]] && [[ "$battery_loaded" != "true" ]]; then
-        echo "- Start battery protections: mpuctl.sh start battery"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ "$edge_loaded" != "true" ]] && [[ "$zoom_loaded" != "true" ]] && [[ "$battery_loaded" != "true" ]] && [[ "$ollama_loaded" != "true" ]] && [[ "$front_loaded" != "true" ]]; then
-        echo "- Baseline automation is off; enable all guards: mpuctl.sh start all"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ -n "${thermal_level:-}" && "${thermal_level}" =~ ^[0-9]+$ ]] && [[ "$thermal_level" -ge 1 ]]; then
-        echo "- Thermal pressure detected (ThermalLevel=${thermal_level}); ensure battery throttle is active: mpuctl.sh start battery"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ -n "${cpu_limit:-}" && "${cpu_limit}" =~ ^[0-9]+$ ]] && [[ "$cpu_limit" -lt 100 ]]; then
-        echo "- CPU speed is limited (${cpu_limit}%); reduce active load and keep throttling on"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ "$edge_mem_mb" -ge "$edge_warn_threshold" ]] && [[ "$edge_loaded" != "true" ]]; then
-        echo "- Edge memory is high; enable guard: mpuctl.sh start edge"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ "$zoom_active" == "true" ]] && [[ "$zoom_loaded" != "true" ]]; then
-        echo "- Zoom is running without guard; enable cleanup/throttling: mpuctl.sh start zoom"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ "$ollama_models" =~ ^[0-9]+$ ]] && [[ "$ollama_models" -gt 0 ]] && [[ "$ollama_loaded" != "true" ]]; then
-        echo "- Ollama has loaded models; enable idle unloads: mpuctl.sh start ollama"
-        rec_count=$((rec_count + 1))
-    fi
-
-    if [[ "$rec_count" -eq 0 ]]; then
-        echo "- No immediate action needed. Current state looks healthy."
-    fi
+    local item
+    for item in "${recommendations[@]}"; do
+        echo "- $item"
+    done
 }
 
 main "$@"
