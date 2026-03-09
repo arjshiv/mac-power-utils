@@ -3,8 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
 LOG_DIR="$HOME/Library/Logs"
-AGENTS=(edge zoom battery ollama front)
+AGENTS=(edge zoom battery ollama front spotlight)
+DAEMON_AGENTS=(spotlight)
 
 usage() {
     cat <<'USAGE'
@@ -23,8 +25,17 @@ Usage:
   mpuctl.sh diagnostics [output-dir]
 
 Agents:
-  edge | zoom | battery | ollama | front | all
+  edge | zoom | battery | ollama | front | spotlight | all
 USAGE
+}
+
+is_daemon() {
+    local agent="$1"
+    local d
+    for d in "${DAEMON_AGENTS[@]}"; do
+        [[ "$agent" == "$d" ]] && return 0
+    done
+    return 1
 }
 
 agent_to_plist() {
@@ -34,6 +45,7 @@ agent_to_plist() {
         battery) echo "com.user.battery-throttle.plist" ;;
         ollama) echo "com.user.ollama-guard.plist" ;;
         front) echo "com.user.front-guard.plist" ;;
+        spotlight) echo "com.user.spotlight-guard.plist" ;;
         *) return 1 ;;
     esac
 }
@@ -45,8 +57,17 @@ agent_to_log() {
         battery) echo "$LOG_DIR/battery-throttle.log" ;;
         ollama) echo "$LOG_DIR/ollama-guard.log" ;;
         front) echo "$LOG_DIR/front-guard.log" ;;
+        spotlight) echo "$LOG_DIR/spotlight-guard.log" ;;
         *) return 1 ;;
     esac
+}
+
+plist_dir_for() {
+    if is_daemon "$1"; then
+        echo "$LAUNCH_DAEMONS_DIR"
+    else
+        echo "$LAUNCH_AGENTS_DIR"
+    fi
 }
 
 list_labels() {
@@ -71,14 +92,22 @@ load_agent() {
         return 1
     }
 
-    local path="$LAUNCH_AGENTS_DIR/$plist"
+    local dir
+    dir="$(plist_dir_for "$agent")"
+    local path="$dir/$plist"
     if [[ ! -f "$path" ]]; then
-        echo "Missing launch agent: $path" >&2
+        echo "Missing plist: $path" >&2
         return 1
     fi
 
-    launchctl unload "$path" >/dev/null 2>&1 || true
-    launchctl load "$path"
+    local label="${plist%.plist}"
+    if is_daemon "$agent"; then
+        sudo launchctl bootout system/"$label" >/dev/null 2>&1 || true
+        sudo launchctl bootstrap system "$path"
+    else
+        launchctl unload "$path" >/dev/null 2>&1 || true
+        launchctl load "$path"
+    fi
     echo "Started $agent"
 }
 
@@ -90,13 +119,20 @@ unload_agent() {
         return 1
     }
 
-    local path="$LAUNCH_AGENTS_DIR/$plist"
+    local dir
+    dir="$(plist_dir_for "$agent")"
+    local path="$dir/$plist"
     if [[ ! -f "$path" ]]; then
-        echo "Missing launch agent: $path" >&2
+        echo "Missing plist: $path" >&2
         return 1
     fi
 
-    launchctl unload "$path" >/dev/null 2>&1 || true
+    local label="${plist%.plist}"
+    if is_daemon "$agent"; then
+        sudo launchctl bootout system/"$label" >/dev/null 2>&1 || true
+    else
+        launchctl unload "$path" >/dev/null 2>&1 || true
+    fi
     echo "Stopped $agent"
 }
 
@@ -136,7 +172,14 @@ reload_agent() {
     }
     label="${plist%.plist}"
 
-    if is_loaded "$label"; then
+    if is_daemon "$agent"; then
+        if sudo launchctl print system/"$label" >/dev/null 2>&1; then
+            sudo launchctl kickstart -k system/"$label" >/dev/null 2>&1 && {
+                echo "Reloaded $agent"
+                return 0
+            }
+        fi
+    elif is_loaded "$label"; then
         local domain_target="gui/$(id -u)/$label"
         if launchctl kickstart -k "$domain_target" >/dev/null 2>&1; then
             echo "Reloaded $agent"
@@ -161,29 +204,39 @@ reload_agents() {
 }
 
 status_agents() {
-    printf "%-8s %-8s %-8s %-s\n" "Agent" "Loaded" "PID" "Log"
-    printf "%-8s %-8s %-8s %-s\n" "-----" "------" "---" "---"
+    printf "%-10s %-8s %-8s %-s\n" "Agent" "Loaded" "PID" "Log"
+    printf "%-10s %-8s %-8s %-s\n" "-----" "------" "---" "---"
 
     local agent
     for agent in "${AGENTS[@]}"; do
         local plist label pid loaded log_path
         plist="$(agent_to_plist "$agent")"
         label="${plist%.plist}"
-        pid="$(pid_for_label "$label")"
         log_path="$(agent_to_log "$agent")"
 
-        if is_loaded "$label"; then
-            loaded="yes"
+        if is_daemon "$agent"; then
+            if sudo launchctl print system/"$label" >/dev/null 2>&1; then
+                loaded="yes"
+                pid="$(sudo launchctl print system/"$label" 2>/dev/null | awk '/pid/ {print $3; exit}')"
+            else
+                loaded="no"
+                pid="-"
+            fi
         else
-            loaded="no"
-            pid="-"
+            pid="$(pid_for_label "$label")"
+            if is_loaded "$label"; then
+                loaded="yes"
+            else
+                loaded="no"
+                pid="-"
+            fi
         fi
 
         if [[ -z "$pid" ]]; then
             pid="-"
         fi
 
-        printf "%-8s %-8s %-8s %-s\n" "$agent" "$loaded" "$pid" "$log_path"
+        printf "%-10s %-8s %-8s %-s\n" "$agent" "$loaded" "$pid" "$log_path"
     done
 }
 
@@ -361,6 +414,7 @@ run_check() {
         "ollama-guard.sh"
         "front-guard.sh"
         "thermal-sanity.sh"
+        "spotlight-guard.sh"
     )
 
     echo "Checking environment..."
@@ -383,12 +437,13 @@ run_check() {
 
     local agent
     for agent in "${AGENTS[@]}"; do
-        local plist
+        local plist dir
         plist="$(agent_to_plist "$agent")"
-        if [[ -f "$LAUNCH_AGENTS_DIR/$plist" ]]; then
-            echo "  [ok] launch agent: $plist"
+        dir="$(plist_dir_for "$agent")"
+        if [[ -f "$dir/$plist" ]]; then
+            echo "  [ok] plist: $dir/$plist"
         else
-            echo "  [warn] launch agent missing: $LAUNCH_AGENTS_DIR/$plist"
+            echo "  [warn] plist missing: $dir/$plist"
         fi
     done
 

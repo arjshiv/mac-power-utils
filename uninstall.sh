@@ -3,8 +3,10 @@ set -euo pipefail
 
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh mpuctl thermal-sanity.sh)
+LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
+SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh mpuctl thermal-sanity.sh spotlight-guard.sh)
 PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
+DAEMON_PLISTS=(com.user.spotlight-guard.plist)
 
 echo "==> Uninstalling mac-power-utils"
 
@@ -22,6 +24,15 @@ for script in "${SCRIPTS[@]}"; do
     if [[ -f "$BIN_DIR/$script" ]]; then
         rm "$BIN_DIR/$script"
         echo "    Removed $script"
+    fi
+done
+
+echo "==> Unloading launchd daemons"
+for plist in "${DAEMON_PLISTS[@]}"; do
+    if [[ -f "$LAUNCH_DAEMONS_DIR/$plist" ]]; then
+        sudo launchctl bootout system/"${plist%.plist}" 2>/dev/null || true
+        sudo rm "$LAUNCH_DAEMONS_DIR/$plist"
+        echo "    Removed $plist (system daemon)"
     fi
 done
 

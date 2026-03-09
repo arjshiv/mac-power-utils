@@ -4,12 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$HOME/bin"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
 LOG_DIR="$HOME/Library/Logs"
 CONFIG_DIR="$HOME/.config/mac-power-utils"
 CONFIG_FILE="$CONFIG_DIR/mac-power-utils.conf"
-SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh mpuctl thermal-sanity.sh)
+SCRIPTS=(edge-mem-guard.sh zoom-guard.sh battery-throttle.sh ollama-guard.sh front-guard.sh mpuctl.sh mpuctl thermal-sanity.sh spotlight-guard.sh)
 PLISTS=(com.user.edge-mem-guard.plist com.user.zoom-guard.plist com.user.battery-throttle.plist com.user.ollama-guard.plist com.user.front-guard.plist)
-LOG_FILES=(edge-mem-guard.log zoom-guard.log battery-throttle.log ollama-guard.log front-guard.log)
+DAEMON_PLISTS=(com.user.spotlight-guard.plist)
+LOG_FILES=(edge-mem-guard.log zoom-guard.log battery-throttle.log ollama-guard.log front-guard.log spotlight-guard.log)
 
 echo "==> Installing mac-power-utils"
 
@@ -50,6 +52,22 @@ for plist in "${PLISTS[@]}"; do
     launchctl load "$LAUNCH_AGENTS_DIR/$plist"
     echo "    Loaded $plist"
 done
+
+echo "==> Installing launchd daemons (requires sudo)"
+for plist in "${DAEMON_PLISTS[@]}"; do
+    sed -e "s|__BIN_DIR__|$BIN_DIR|g" \
+        -e "s|__HOME__|$HOME|g" \
+        "$SCRIPT_DIR/launchd/$plist" > "/tmp/$plist"
+
+    sudo mv "/tmp/$plist" "$LAUNCH_DAEMONS_DIR/$plist"
+    sudo chown root:wheel "$LAUNCH_DAEMONS_DIR/$plist"
+    sudo launchctl bootout system/"${plist%.plist}" 2>/dev/null || true
+    sudo launchctl bootstrap system "$LAUNCH_DAEMONS_DIR/$plist"
+    echo "    Loaded $plist (system daemon)"
+done
+
+echo "==> Running initial Spotlight guard setup"
+sudo "$BIN_DIR/spotlight-guard.sh" --init
 
 echo ""
 echo "==> Sudoers setup for battery-throttle"
