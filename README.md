@@ -11,6 +11,7 @@ Background daemons for Apple Silicon Macs that manage memory and thermals for Ed
 | `battery-throttle.sh` | Enables Low Power Mode on battery, renices heavy processes, reverts on AC |
 | `ollama-guard.sh` | Unloads idle Ollama models to reclaim GB of RAM |
 | `front-guard.sh` | Restarts Front when backgrounded and bloated to reclaim leaked memory |
+| `spotlight-guard.sh` | Whitelist-only Spotlight indexing — excludes everything except chosen dirs |
 | `mpuctl` | One command for service status/start/stop/restart/logs |
 | `thermal-sanity.sh` | Quick thermal/power/fan snapshot with run recommendations |
 
@@ -66,6 +67,17 @@ Watches for loaded Ollama models sitting idle (no active generation). After 10 m
 
 Front (Electron email client) leaks memory over time — a single renderer can grow to 500 MB+ while backgrounded. This guard detects when Front has no visible windows, isn't frontmost, and has exceeded a memory threshold (default 512 MB) for 15 minutes, then quits and relaunches it in the background. Safe because Front reconnects and resyncs on launch. Won't restart if you're actively composing.
 
+### spotlight-guard
+
+Enforces whitelist-only Spotlight indexing. By default, macOS indexes your entire home directory which tanks performance on large codebases. This guard flips the model: only explicitly whitelisted directories get indexed, everything else is excluded. Runs as a system daemon every 30 minutes to catch newly created directories (worktrees, cloned repos, etc.) and automatically exclude them.
+
+Default whitelist:
+- `~/Downloads`
+- `~/Applications`
+- `~/Library/CloudStorage/*` (Dropbox, Google Drive, etc.)
+
+System-level `/Applications` and `/System` are always indexed by Spotlight regardless.
+
 ## Configuration
 
 All daemon settings are centralized in:
@@ -80,6 +92,8 @@ You can tune thresholds/intervals per guard there without editing scripts. Examp
 EDGE_MEM_GUARD_THRESHOLD_MB=6144
 ZOOM_GUARD_IDLE_TIMEOUT_MIN=8
 OLLAMA_GUARD_IDLE_TIMEOUT_MIN=5
+SPOTLIGHT_GUARD_WHITELIST_TOP="Downloads Applications"
+SPOTLIGHT_GUARD_WHITELIST_LIB="CloudStorage"
 ```
 
 After changing config, re-run:
@@ -134,6 +148,7 @@ All daemons log to `~/Library/Logs/`:
 - `battery-throttle.log`
 - `ollama-guard.log`
 - `front-guard.log`
+- `spotlight-guard.log`
 
 Each daemon also uses a lock directory under `/tmp` to prevent duplicate instances.
 
@@ -153,6 +168,8 @@ zoom-guard.sh ────────┬── kills idle Zoom (battery and AC)
 ollama-guard.sh ──────── unloads idle models (battery and AC)
 
 front-guard.sh ───────── restarts bloated Front when backgrounded
+
+spotlight-guard.sh ───── whitelist-only Spotlight indexing (system daemon)
 ```
 
 ## License

@@ -123,6 +123,27 @@ Even when not in a meeting, Zoom keeps all of these alive, consuming 200-500MB R
 
 ---
 
+## Component 4: `spotlight-guard.sh`
+
+**Purpose:** Enforce whitelist-only Spotlight indexing so new directories (worktrees, repos, node_modules) are automatically excluded.
+
+**Logic (run-once, called every 30 minutes by launchd):**
+1. Source config for whitelist settings (`WHITELIST_TOP`, `WHITELIST_LIB`)
+2. Enumerate all directories and files in `$HOME`
+3. Skip `~/Library` (handled separately — only `~/Library/CloudStorage` is kept)
+4. Build exclusion list: everything NOT in the whitelist
+5. Write exclusions to `/.Spotlight-V100/VolumeConfiguration` via `defaults write`
+6. On `--init` flag: also enable indexing (`mdutil -i on /`) and rebuild index (`mdutil -E /`)
+
+**Config:**
+- `SPOTLIGHT_GUARD_WHITELIST_TOP="Downloads Applications"` — top-level dirs in ~ to keep indexed
+- `SPOTLIGHT_GUARD_WHITELIST_LIB="CloudStorage"` — ~/Library subdirs to keep indexed
+
+**Why a system daemon (not user agent):**
+Writing to `/.Spotlight-V100/VolumeConfiguration` requires root. Rather than adding complex sudoers entries for `defaults` and `mdutil`, the guard runs as a LaunchDaemon natively as root. The `MPU_USER_HOME` environment variable is set in the plist to point at the correct home directory.
+
+---
+
 ## Launchd Agents
 
 ### `com.user.edge-mem-guard.plist`
@@ -176,6 +197,16 @@ Even when not in a meeting, Zoom keeps all of these alive, consuming 200-500MB R
 
 ---
 
+### `com.user.spotlight-guard.plist` (LaunchDaemon)
+- **RunAtLoad:** true
+- **StartInterval:** 1800 (every 30 minutes)
+- **ProgramArguments:** `["/Users/.../bin/spotlight-guard.sh"]`
+- **EnvironmentVariables:** `MPU_USER_HOME=/Users/...`
+- **StandardOutPath / StandardErrorPath:** `~/Library/Logs/spotlight-guard.log`
+- **Note:** Installed to `/Library/LaunchDaemons/` (not LaunchAgents) because writing Spotlight exclusions requires root
+
+---
+
 ## Interaction Between Components
 
 ```
@@ -188,6 +219,8 @@ edge-mem-guard.sh ────┴── monitors Edge memory independently
 
 zoom-guard.sh ────────┬── kills idle Zoom (battery and AC)
                       └── extra renice during calls (battery only)
+
+spotlight-guard.sh ───── whitelist-only Spotlight exclusions (periodic, root)
 ```
 
 The battery-throttle and zoom-guard scripts both renice Zoom, but this is idempotent — calling `renice 10` twice is harmless. zoom-guard handles the Zoom-specific logic (idle kill, CptHost cleanup), while battery-throttle handles the system-wide knobs (Low Power Mode) and blanket renicing.
