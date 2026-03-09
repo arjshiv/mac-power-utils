@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.spotlight-guard</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__BIN_DIR__/spotlight-guard.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>MPU_USER_HOME</key>
+        <string>__HOME__</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/spotlight-guard.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/spotlight-guard.log</string>
+</dict>
+</plist>
